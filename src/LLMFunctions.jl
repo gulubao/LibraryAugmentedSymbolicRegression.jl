@@ -165,7 +165,7 @@ function _gen_llm_random_tree(
             String(strip(gen_tree_options[l], [' ', '\n', '"', ',', '.', '[', ']'])),
             options,
         )
-        if t.val == 1 && t.constant
+        if t.tree.val == 1 && t.tree.constant
             continue
         end
         log_generation!(
@@ -174,7 +174,7 @@ function _gen_llm_random_tree(
             mode="gen_random",
             chosen=render_expr(t, options),
         )
-        return t
+        return get_contents(t)
     end
 
     out = parse_expr(
@@ -184,11 +184,11 @@ function _gen_llm_random_tree(
         options.lasr_logger; id=gen_id, mode="gen_random", chosen=render_expr(out, options)
     )
 
-    if out.val == 1 && out.constant
+    if out.tree.val == 1 && out.tree.constant
         return gen_random_tree_fixed_size(node_count, options, nfeatures, T)
     end
 
-    return out
+    return get_contents(out)
 end
 
 function concept_evolution(idea_database, options::AbstractOptions)
@@ -525,14 +525,14 @@ function llm_mutate_tree(
             String(strip(mut_tree_options[l], [' ', '\n', '"', ',', '.', '[', ']'])),
             options,
         )
-        if t.val == 1 && t.constant
+        if t.tree.val == 1 && t.tree.constant
             continue
         end
 
         log_generation!(
             options.lasr_logger; id=gen_id, mode="mutate", chosen=render_expr(t, options)
         )
-        return t
+        return get_contents(t)
     end
 
     out = parse_expr(
@@ -542,7 +542,7 @@ function llm_mutate_tree(
     log_generation!(
         options.lasr_logger; id=gen_id, mode="mutate", chosen=render_expr(out, options)
     )
-    return out
+    return get_contents(out)
 end
 
 function llm_crossover_trees(
@@ -676,32 +676,32 @@ function llm_crossover_trees(
             String(strip(cross_tree_options[l], [' ', '\n', '"', ',', '.', '[', ']'])),
             options,
         )
-        if t.val == 1 && t.constant
+        if t.tree.val == 1 && t.tree.constant
             continue
         end
 
         if isnothing(cross_tree1)
-            cross_tree1 = t
+            cross_tree1 = get_contents(t)
         elseif isnothing(cross_tree2)
-            cross_tree2 = t
+            cross_tree2 = get_contents(t)
             break
         end
     end
 
     if isnothing(cross_tree1)
-        cross_tree1 = parse_expr(
+        cross_tree1 = get_contents(parse_expr(
             T,
             String(strip(cross_tree_options[1], [' ', '\n', '"', ',', '.', '[', ']'])),
             options,
-        )
+        ))
     end
 
     if isnothing(cross_tree2)
-        cross_tree2 = parse_expr(
+        cross_tree2 = get_contents(parse_expr(
             T,
             String(strip(cross_tree_options[2], [' ', '\n', '"', ',', '.', '[', ']'])),
             options,
-        )
+        ))
     end
 
     recording_str =
