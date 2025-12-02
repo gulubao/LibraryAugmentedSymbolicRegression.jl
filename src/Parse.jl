@@ -203,7 +203,7 @@ function levenshtein(s1, s2)
     return d[m+1, n+1]
 end
 
-function find_closest_match(target::String, candidates::Vector{String})
+function find_closest_match(target::AbstractString, candidates::Vector{String})
     best_match = nothing
     min_dist = typemax(Int)
     for cand in candidates
