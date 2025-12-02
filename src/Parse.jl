@@ -141,6 +141,7 @@ function _normalize_expr_string(s::AbstractString)
     s = replace(s, r"(?<!\w)\(C\)(?!\w)" => "(1.0)")
     # TODO: Right now, making all variables lowercase. This might not always be desired.
     s = lowercase(s)
+    s = replace(s, r"(?<!\w)pi(?!\w)" => "3.141592653589793")
     s = replace(s, r"\*\*" => "^")
     strip(s)
 end
