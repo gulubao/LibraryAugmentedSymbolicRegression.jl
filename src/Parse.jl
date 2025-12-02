@@ -50,6 +50,7 @@ AbstractExpressionNode.
     end
 
     ast = _rhs_of_assignment(ast)
+    ast = _fix_unary_minus(ast)
 
     try
         return parse_expression(
@@ -60,6 +61,39 @@ AbstractExpressionNode.
             variable_names=varnames,
         )::AbstractExpression{T}
     catch e
+        # Try to recover from missing variable error
+        msg = sprint(showerror, e)
+        m = match(r"Variable `([^`]+)` not found", msg)
+        if m !== nothing
+            missing_var = m.captures[1]
+            closest = find_closest_match(missing_var, varnames)
+            if closest !== nothing
+                @warn "Variable `$missing_var` not found. Correcting to `$closest`."
+                # Replace with word boundaries to avoid partial replacements
+                # We assume missing_var is a valid identifier, so \b works.
+                new_expr = replace(expr_str_norm, Regex("\\b" * missing_var * "\\b") => closest)
+                
+                if new_expr != expr_str_norm
+                    try
+                        # Re-parse the corrected string
+                        new_ast = Meta.parse(new_expr)
+                        new_ast = _rhs_of_assignment(new_ast)
+                        
+                        return parse_expression(
+                            new_ast;
+                            operators=ops,
+                            node_type=node_type,
+                            expression_type=expression_type,
+                            variable_names=varnames,
+                        )::AbstractExpression{T}
+                    catch e2
+                        @warn "Failed to parse even after correction: $new_expr"
+                        @warn "Error: $e2"
+                    end
+                end
+            end
+        end
+
         @warn "Failed to parse expression: $expr_str"
         @warn "Normalized: $expr_str_norm"
         @warn "Error: $e"
@@ -79,6 +113,24 @@ end
         end
     end
     return ast
+end
+
+@unstable function _rhs_of_assignment(ast::Symbol)
+    return ast
+end
+
+function _fix_unary_minus(expr::Expr)
+    if expr.head == :call && expr.args[1] == :- && length(expr.args) == 2
+        # It's a unary minus: -(x) -> neg(x)
+        return Expr(:call, :neg, _fix_unary_minus(expr.args[2]))
+    else
+        # Recurse on args
+        return Expr(expr.head, map(_fix_unary_minus, expr.args)...)
+    end
+end
+
+function _fix_unary_minus(x)
+    return x
 end
 
 function _normalize_expr_string(s::AbstractString)
@@ -137,6 +189,37 @@ end
 
 function get_variable_names(variable_names::Nothing)::Vector{String}
     return ["x", "y", "z", "k", "j", "l", "m", "n", "p", "a", "b"]
+end
+
+function levenshtein(s1, s2)
+    m, n = length(s1), length(s2)
+    d = Matrix{Int}(undef, m+1, n+1)
+    for i in 0:m; d[i+1, 1] = i; end
+    for j in 0:n; d[1, j+1] = j; end
+    for i in 1:m, j in 1:n
+        cost = s1[i] == s2[j] ? 0 : 1
+        d[i+1, j+1] = min(d[i, j+1]+1, d[i+1, j]+1, d[i, j]+cost)
+    end
+    return d[m+1, n+1]
+end
+
+function find_closest_match(target::String, candidates::Vector{String})
+    best_match = nothing
+    min_dist = typemax(Int)
+    for cand in candidates
+        dist = levenshtein(target, cand)
+        if dist < min_dist
+            min_dist = dist
+            best_match = cand
+        end
+    end
+    # Heuristic: only accept if distance is reasonable
+    # Allow a bit more flexibility for longer words
+    threshold = max(3, length(target) ÷ 2)
+    if min_dist <= threshold
+        return best_match
+    end
+    return nothing
 end
 
 end

@@ -124,22 +124,7 @@ function format_pareto(dominating, options, num_pareto_context::Int)::Vector{Str
     return pareto
 end
 
-function sample_one_context(idea_database, max_concepts)::String
-    if isnothing(idea_database)
-        return "None"
-    end
 
-    N = size(idea_database)[1]
-    if N == 0
-        return "None"
-    end
-
-    try
-        idea_database[rand(1:min(max_concepts, N))]
-    catch e
-        "None"
-    end
-end
 
 function sample_context(idea_database, N, max_concepts)::Vector{String}
     assumptions = Vector{String}()
@@ -150,23 +135,35 @@ function sample_context(idea_database, N, max_concepts)::Vector{String}
         return assumptions
     end
 
-    if size(idea_database)[1] < N
-        for i in 1:(size(idea_database)[1])
-            push!(assumptions, idea_database[i])
-        end
-        for i in (size(idea_database)[1] + 1):N
+    db_len = size(idea_database)[1]
+    pool_size = min(db_len, max_concepts)
+
+    if pool_size == 0
+        for _ in 1:N
             push!(assumptions, "None")
         end
         return assumptions
     end
 
-    while size(assumptions)[1] < N
-        chosen_idea = sample_one_context(idea_database, max_concepts)
-        if chosen_idea in assumptions
-            continue
+    # Determine how many real items we can get
+    num_real_items = min(N, pool_size)
+    
+    # Get random indices from the pool
+    indices = randperm(pool_size)[1:num_real_items]
+    
+    for idx in indices
+        try
+            push!(assumptions, idea_database[idx])
+        catch
+            push!(assumptions, "None")
         end
-        push!(assumptions, chosen_idea)
     end
+
+    # Fill the rest with "None" if N > pool_size
+    while length(assumptions) < N
+        push!(assumptions, "None")
+    end
+
     return assumptions
 end
 
