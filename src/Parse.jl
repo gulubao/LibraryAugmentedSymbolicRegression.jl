@@ -120,13 +120,9 @@ end
 end
 
 function _fix_unary_minus(expr::Expr)
-    if expr.head == :call && expr.args[1] == :- && length(expr.args) == 2
-        # It's a unary minus: -(x) -> neg(x)
-        return Expr(:call, :neg, _fix_unary_minus(expr.args[2]))
-    else
-        # Recurse on args
-        return Expr(expr.head, map(_fix_unary_minus, expr.args)...)
-    end
+    # Return expression unchanged to allow standard unary minus parsing
+    # DynamicExpressions handles unary/binary operator overloading by arity
+    return expr
 end
 
 function _fix_unary_minus(x)
